@@ -1,3 +1,5 @@
+﻿# coding=utf-8
+
 import filecmp
 import importlib.util
 import os
@@ -44,7 +46,7 @@ def check_versions():
             if check in reqs_dict:
                 req_version = reqs_dict[check]
                 if str(check_ver) == str(req_version):
-                    status = "[X]"
+                    status = "[✓]"
                 else:
                     status = "[!]"
         except importlib_metadata.PackageNotFoundError:
