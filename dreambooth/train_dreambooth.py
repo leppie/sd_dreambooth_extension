@@ -1,4 +1,5 @@
 import argparse
+import collections
 import hashlib
 import itertools
 import logging
@@ -329,6 +330,29 @@ class LatentsDataset(Dataset):
         self.current_concept = self.concepts_cache[index]
         return self.latents_cache[index], self.text_encoder_cache[index]
 
+class RollingAverage:
+    def __init__(self, size):
+        # Initialize the class with a fixed window size
+        self.size = size
+        # Use a deque to track the list of values
+        self.deque = collections.deque(maxlen=self.size)
+        # Set the initial sum to 0
+        self.sum = 0
+
+    def add(self, value):
+        # If the deque is at maximum capacity, remove the oldest value
+        # before adding the new value
+        if len(self.deque) == self.size:
+            self.sum -= self.deque[0]
+            self.deque.popleft()
+
+        # Add the new value to the deque and update the sum
+        self.deque.append(value)
+        self.sum += value
+
+    def get(self):
+        # Return the average of the values in the deque
+        return self.sum / len(self.deque)
 
 class AverageMeter:
     def __init__(self, name=None):
@@ -570,7 +594,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
             print("Applying lora unet weights before training...")
             loras = torch.load(lora_path)
             weight_apply_lora(unet, loras)
-        print("Injecting trainable lora...")
+        print("Injecting trainable lora unet...")
         unet_lora_params, train_names = inject_trainable_lora(unet)
 
         if args.train_text_encoder:
@@ -580,6 +604,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                 loras = torch.load(lora_txt)
                 weight_apply_lora(text_encoder, loras, target_replace_module=["CLIPAttention"])
 
+            print("Injecting trainable lora text encoder...")
             text_encoder_lora_params, _ = inject_trainable_lora(text_encoder, target_replace_module=["CLIPAttention"])
 
     if args.scale_lr:
@@ -932,7 +957,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                                     shared.state.current_image = s_image
                                     samples.append(s_image)
                                     image_name = os.path.join(sample_dir, f"sample_{args.revision}-{ci}{si}.png")
-                                    txt_name = image_name.replace(".jpg", ".txt")
+                                    txt_name = image_name.replace(".png", ".txt")
                                     with open(txt_name, "w", encoding="utf8") as txt_file:
                                         txt_file.write(c.prompt)
                                     s_image.save(image_name)
@@ -963,7 +988,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     shared.state.job_count = max_train_steps
     shared.state.job_no = global_step
     shared.state.textinfo = f"Training step: {global_step}/{max_train_steps}"
-    loss_avg = AverageMeter()
+    loss_avg = RollingAverage(len(train_dataloader) * 5)
     text_enc_context = nullcontext() if args.train_text_encoder else torch.no_grad()
     training_complete = False
     msg = ""
@@ -1042,20 +1067,11 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                     optimizer.step()
                     lr_scheduler.step()
                     optimizer.zero_grad(set_to_none=True)
-                    loss_avg.update(loss.detach_(), bsz)
+                    loss_avg.add(loss.item())
 
                     # Update EMA
                     if args.use_ema and ema_unet is not None:
                         ema_unet.step(unet.parameters())
-
-                if not global_step % 2:
-                    allocated = round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1)
-                    cached = round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1)
-                    logs = {"loss": loss_avg.avg.item(), "lr": lr_scheduler.get_last_lr()[0],
-                            "vram": f"{allocated}/{cached}GB"}
-                    progress_bar.set_postfix(**logs)
-                    accelerator.log(logs, step=args.revision)
-                    loss_avg.reset()
 
                 training_complete = global_step >= actual_train_steps or shared.state.interrupted
                 if not args.save_use_epochs:
@@ -1100,6 +1116,13 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                 args.revision += args.train_batch_size
                 shared.state.job_no = global_step
 
+            allocated = round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1)
+            cached = round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1)
+            logs = {"loss": loss_avg.get(), "lr": lr_scheduler.get_last_lr()[0],
+                    "vram": f"{allocated}/{cached}GB"}
+            progress_bar.set_postfix(**logs)
+            accelerator.log(logs, step=args.revision)
+
             training_complete = global_step >= actual_train_steps or shared.state.interrupted
             accelerator.wait_for_everyone()
             if not args.not_cache_latents:
@@ -1127,8 +1150,8 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
         args.save()
         global_epoch += 1
 
-        if training_complete:
-            break
+        # if training_complete:
+        #     break
 
         if args.save_use_epochs:
             if args.save_use_global_counts:
