@@ -788,23 +788,23 @@ def extract_checkpoint(new_model_name: str, ckpt_path: str, scheduler_type="ddim
             # Todo: Decide if we should store this separately in the db_config and append it when re-compiling models.
             # global_step = checkpoint["global_step"]
             checkpoint = checkpoint["state_dict"] if "state_dict" in checkpoint else checkpoint
-            rev_keys = ["db_global_step", "global_step"]
+            rev_keys = ["model_ema.num_updates", "db_global_step", "global_step"]
             epoch_keys = ["db_epoch", "epoch"]
 
             for key in rev_keys:
                 if key in checkpoint:
-                    revision = checkpoint[key]
+                    revision = checkpoint[key].item()
                     break
 
             for key in epoch_keys:
                 if key in checkpoint:
-                    epoch = checkpoint[key]
+                    epoch = checkpoint[key].item()
                     break
 
             key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
 
             if key_name in checkpoint and checkpoint[key_name].shape[-1] == 1024:
-                if revision == 875000 or revision == 220000:
+                if revision == 875000 or revision == 219998: # v2.1 768 == 219996
                     print(f"Model revision is {revision}, assuming v2, 512 model.")
                     is_512 = True
                 else:
