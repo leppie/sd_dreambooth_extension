@@ -581,8 +581,12 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     if not args.train_text_encoder:
         text_encoder.requires_grad_(False)
 
+    if not args.use_unet:
+        unet.requires_grad_(False)        
+
     if args.gradient_checkpointing:
-        unet.enable_gradient_checkpointing()
+        if args.use_unet:
+            unet.enable_gradient_checkpointing()
         if args.train_text_encoder:
             text_encoder.gradient_checkpointing_enable()
 
@@ -636,8 +640,9 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
         )
     else:
         params_to_optimize = (
-            itertools.chain(unet.parameters(), text_encoder.parameters()) if args.train_text_encoder
-            else unet.parameters()
+            itertools.chain(text_encoder.parameters()) if args.train_text_encoder and not args.use_unet else 
+            itertools.chain(unet.parameters(), text_encoder.parameters()) if args.train_text_encoder else 
+            unet.parameters()
         )
     optimizer = optimizer_class(
         params_to_optimize,
@@ -846,9 +851,9 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
 
     # Train!
     total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
-    stats = f"CPU: {args.use_cpu} Adam: {use_adam}, Prec: {args.mixed_precision}, " \
-            f"Grad: {args.gradient_checkpointing}, TextTr: {args.train_text_encoder} EM: {args.use_ema}, " \
-            f"LR: {args.learning_rate} LORA:{args.use_lora}"
+    stats = f"CPU: {args.use_cpu}, Adam: {use_adam}, Prec: {args.mixed_precision}, " \
+            f"Grad: {args.gradient_checkpointing}, TextTr: {args.train_text_encoder}, EM: {args.use_ema}, " \
+            f"LR: {args.learning_rate}, LORA: {args.use_lora}, UNET: {args.use_unet}"
 
     print("***** Running training *****")
     print(f"  Num examples = {len(train_dataset)}")
@@ -959,7 +964,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                                     image_name = os.path.join(sample_dir, f"sample_{args.revision}-{ci}{si}.png")
                                     txt_name = image_name.replace(".png", ".txt")
                                     with open(txt_name, "w", encoding="utf8") as txt_file:
-                                        txt_file.write(c.prompt)
+                                        txt_file.write(c.prompt + f"\nseed:{seed}")
                                     s_image.save(image_name)
                                 ci += 1
                             if len(samples) > 1:
@@ -997,12 +1002,13 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
         if training_complete:
             break
         try:
-            unet.train()
+            if args.use_unet:
+                unet.train()
             if args.train_text_encoder and text_encoder is not None:
                 text_encoder.train()
             for step, batch in enumerate(train_dataloader):
                 weights_saved = False
-                with accelerator.accumulate(unet):
+                with accelerator.accumulate(unet), accelerator.accumulate(text_encoder):
                     # Convert images to latent space
                     with torch.no_grad():
                         if not args.not_cache_latents:
