@@ -713,20 +713,20 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                                 seed = c.seed
                                 if seed is None or seed == '' or seed == -1:
                                     seed = int(random.randrange(21474836147))
-                                g_cuda = torch.Generator(device=accelerator.device).manual_seed(seed)
+                                g_cuda = torch.Generator(device=accelerator.device)
                                 for si in tqdm(range(c.n_samples), desc="Generating samples"):
                                     s_image = s_pipeline(c.prompt, num_inference_steps=c.steps,
                                                          guidance_scale=c.scale,
                                                          negative_prompt=c.negative_prompt,
                                                          height=args.resolution,
                                                          width=args.resolution,
-                                                         generator=g_cuda).images[0]
+                                                         generator=g_cuda.manual_seed(seed + si)).images[0]
                                     shared.state.current_image = s_image
                                     samples.append(s_image)
                                     image_name = os.path.join(sample_dir, f"sample_{args.revision}-{ci}{si}.png")
                                     txt_name = image_name.replace(".png", ".txt")
                                     with open(txt_name, "w", encoding="utf8") as txt_file:
-                                        txt_file.write(c.prompt + f"\nseed:{seed}")
+                                        txt_file.write(c.prompt + f"\nseed:{(seed + si)}")
                                     s_image.save(image_name)
                                 ci += 1
                             if len(samples) > 1:
