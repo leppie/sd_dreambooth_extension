@@ -904,13 +904,19 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                     args = from_file(args.model_name)
                 msg = f"Training completed, total steps: {args.revision}"
                 break
-        except Exception as m:
-            msg = f"Exception while training: {m}"
+        except RuntimeError as re:
+            msg = f"RuntimeError while training: {re}"
             printm(msg)
             traceback.print_exc()
             mem_summary = torch.cuda.memory_summary()
             print(mem_summary)
+            break            
+        except Exception as m:
+            msg = f"Exception while training: {m}"
+            printm(msg)
+            traceback.print_exc()
             break
+
         if shared.state.interrupted:
             training_complete = True
 
