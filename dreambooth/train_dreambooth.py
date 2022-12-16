@@ -46,7 +46,7 @@ pil_features = list_features()
 mem_record = {}
 with_prior = False
 
-torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.benchmark = True
 
 logger = logging.getLogger(__name__)
 # define a Handler which writes DEBUG messages or higher to the sys.stderr
@@ -568,7 +568,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader))
     if max_train_steps is None or max_train_steps < 1:
         max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
@@ -576,8 +576,8 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     lr_scheduler = get_scheduler(
         args.lr_scheduler,
         optimizer=optimizer,
-        num_warmup_steps=args.lr_warmup_steps * args.gradient_accumulation_steps,
-        num_training_steps=max_train_steps * args.gradient_accumulation_steps,
+        num_warmup_steps=args.lr_warmup_steps,
+        num_training_steps=max_train_steps,
     )
 
     # create ema, fix OOM
@@ -605,7 +605,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
 
     printm("Scheduler, EMA Loaded.")
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader))
     if overrode_max_train_steps:
         max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
