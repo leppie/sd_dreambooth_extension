@@ -79,7 +79,7 @@ new_titles = {
     "Instance Prompt": "A prompt describing the subject. Use [Filewords] to parse image filename/.txt to insert existing prompt here.",
     "Instance Token": "When using [filewords], this is the instance identifier that is unique to your subject. Should be a single word.",
     "Learning Rate Scheduler": "The learning rate scheduler to use.",
-    "Learning Rate Warmup Steps": "Number of steps for the warmup in the lr scheduler.",
+    "Learning Rate Warmup Steps": "Number of steps for the warmup in the lr scheduler. Applies to all schedulers except constant.",
     "Learning Rate": "The rate at which the model learns. Default is 0.000005. Use a lower value like 0.000002 or 0.000001 for more complex subjects...like people.",
     "Load Params": "Load last saved training parameters for the model..",
     "Log Memory": "Log the current GPU memory usage.",
@@ -127,7 +127,8 @@ new_titles = {
     "Use Concepts List": "Train multiple concepts from a JSON file or string.",
     "Use Lifetime Steps/Epochs When Saving": "When checked, will save preview images and checkpoints using lifetime steps/epochs, versus current training steps.",
     "Use EMA": "Enabling this will provide better results and editability, but cost more VRAM.",
-    "Use LORA": "Uses Low-rank Adaptation for Fast Text-to-Image Diffusion Fine-tuning. Uses less VRAM, saves a .pt file instead of a full checkpoint"
+    "Use LORA": "Uses Low-rank Adaptation for Fast Text-to-Image Diffusion Fine-tuning. Uses less VRAM, saves a .pt file instead of a full checkpoint",
+    "Use UNET": "Stops the UNET from being trained. Do not disable this unless you know exactly what you are doing."
 }
 
 ex_titles = Object.assign({}, ex_titles, new_titles);
