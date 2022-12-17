@@ -894,12 +894,12 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                 args.revision += args.train_batch_size
                 shared.state.job_no = global_step
 
-            allocated = round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1)
-            cached = round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1)
-            logs = {"loss": loss_avg.get(), "lr": lr_scheduler.get_last_lr()[0],
-                    "vram": f"{allocated}/{cached}GB"}
-            progress_bar.set_postfix(**logs)
-            accelerator.log(logs, step=args.revision)
+                allocated = round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1)
+                cached = round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1)
+                logs = {"loss": loss_avg.get(), "lr": lr_scheduler.get_last_lr()[0],
+                        "vram": f"{allocated}/{cached}GB"}
+                progress_bar.set_postfix(**logs)
+                accelerator.log(logs, step=args.revision)
 
             training_complete = global_step >= actual_train_steps or shared.state.interrupted
             accelerator.wait_for_everyone()
