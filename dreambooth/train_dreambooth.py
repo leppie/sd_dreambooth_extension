@@ -872,8 +872,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
 
                 if shared.state.interrupted:
                     training_complete = True
-                if global_step == 0 or global_step == 5:
-                    printm(f"Step {global_step} completed.")
+                
                 shared.state.textinfo = f"Training, step {global_step}/{actual_train_steps} current," \
                                         f" {args.revision}/{actual_train_steps + lifetime_step} lifetime"
 
@@ -883,10 +882,8 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                         state = "cancelled"
                     else:
                         state = "complete"
-
                     shared.state.textinfo = f"Training {state} {global_step}/{actual_train_steps}, {args.revision}" \
                                             f" total."
-
                     break
 
                 progress_bar.update(args.train_batch_size)
@@ -903,8 +900,10 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
 
             training_complete = global_step >= actual_train_steps or shared.state.interrupted
             accelerator.wait_for_everyone()
+
             if not args.not_cache_latents:
                 train_dataset, train_dataloader = cache_latents(enc_vae=vae, orig_dataset=gen_dataset)
+
             if training_complete:
                 if not weights_saved:
                     save_img = True
@@ -915,6 +914,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                     weights_saved = save_model
                 msg = f"Training completed, total steps: {args.revision}"
                 break
+
         except RuntimeError as re:
             msg = f"RuntimeError while training: {re}"
             printm(msg)
