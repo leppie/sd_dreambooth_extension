@@ -933,16 +933,15 @@ def extract_checkpoint(new_model_name: str, ckpt_path: str, scheduler_type="ddim
             elif text_model_type == "FrozenCLIPEmbedder":
                 text_model = convert_ldm_clip_checkpoint(checkpoint)
                 tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
-                safety_checker = StableDiffusionSafetyChecker.from_pretrained("CompVis/stable-diffusion-safety-checker")
-                feature_extractor = AutoFeatureExtractor.from_pretrained("CompVis/stable-diffusion-safety-checker")
                 pipe = StableDiffusionPipeline(
                     vae=vae,
                     text_encoder=text_model,
                     tokenizer=tokenizer,
                     unet=unet,
                     scheduler=scheduler,
-                    safety_checker=safety_checker,
-                    feature_extractor=feature_extractor
+                    safety_checker=None,
+                    feature_extractor=None,
+                    requires_safety_checker=False
                 )
             else:
                 text_config = create_ldm_bert_config(original_config)
