@@ -771,8 +771,6 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     msg = ""
     weights_saved = False
     for epoch in range(args.num_train_epochs):
-        if training_complete:
-            break
         try:
             if args.train_unet:
                 unet.train()
