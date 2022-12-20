@@ -396,7 +396,6 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
             traceback.print_exc()
 
     if args.use_lora:
-
         args.learning_rate = args.lora_learning_rate
         
         params_to_optimize = ([
@@ -412,6 +411,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
             itertools.chain(unet.parameters(), text_encoder.parameters()) if args.train_text_encoder else 
             unet.parameters()
         )
+
     optimizer = optimizer_class(
         params_to_optimize,
         lr=args.learning_rate,
@@ -570,6 +570,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    
     if max_train_steps is None or max_train_steps < 1:
         max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
