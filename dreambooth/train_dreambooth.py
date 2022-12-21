@@ -780,6 +780,10 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
             if args.train_text_encoder and text_encoder is not None:
                 text_encoder.train()
             for step, batch in enumerate(train_dataloader):
+                mem_allocated = 0
+                mem_reserved = 0
+                mem_max_allocated = 0
+                mem_max_reserved = 0                
                 weights_saved = False
                 with accelerator.accumulate(unet), accelerator.accumulate(text_encoder):
                     # Convert images to latent space
@@ -845,6 +849,13 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                     accelerator.backward(loss)
                     optimizer.step()
                     lr_scheduler.step()
+
+                    # this is the best place to track mem usage
+                    mem_allocated = torch.cuda.memory_allocated(0)
+                    mem_reserved = torch.cuda.memory_reserved(0)
+                    mem_max_allocated = torch.cuda.max_memory_allocated(0)
+                    mem_max_reserved = torch.cuda.max_memory_reserved(0)
+
                     optimizer.zero_grad(set_to_none=True)
                     loss_avg.add(loss.item())
 
@@ -897,6 +908,13 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                 logs = {"loss": loss_avg.get(), "lr": lr_scheduler.get_last_lr()[0],
                         "vram": f"{allocated}/{cached}GB"}
                 progress_bar.set_postfix(**logs)
+
+                # append some extra metrics for tensorboard
+                logs["mem_allocated"] = mem_allocated
+                logs["mem_max_allocated"] = mem_max_allocated
+                logs["mem_reserved"] = mem_reserved
+                logs["mem_max_reserved"] = mem_max_reserved
+
                 accelerator.log(logs, step=args.revision)
 
             training_complete = global_step >= actual_train_steps or shared.state.interrupted
