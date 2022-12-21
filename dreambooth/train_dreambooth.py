@@ -969,7 +969,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
             training_complete = True
 
         args.epoch += global_epoch
-        args.save()
+        #args.save()
         global_epoch += 1
 
         if args.save_use_epochs:
