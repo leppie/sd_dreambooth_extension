@@ -769,7 +769,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
             # cleanup()
 
     # Only show the progress bar once on each machine.
-    progress_bar = tqdm(range(actual_train_steps), disable=not accelerator.is_local_main_process)
+    progress_bar = tqdm(range(actual_train_steps), disable=not accelerator.is_local_main_process, smoothing=0.1)
     progress_bar.set_description("Steps")
     global_step = 0
     global_epoch = 0
@@ -1003,4 +1003,6 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
 
     cleanup_memory()
     accelerator.end_training()
+    progress_bar.close()
+
     return args, mem_record, msg
