@@ -891,7 +891,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                             save_img = args.save_preview_every and not global_step % args.save_preview_every
                             save_model = args.save_embedding_every and not global_step % args.save_embedding_every
                         if training_complete:
-                            save_img = True
+                            save_img = False
                             save_model = True
                         if save_img or save_model:
                             args.save()
