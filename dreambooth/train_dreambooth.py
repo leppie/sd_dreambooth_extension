@@ -149,8 +149,17 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     args.tokenizer_name = None
     global mem_record
     mem_record = memory_record
+    project_name = "dreambooth"
     max_train_steps = args.max_train_steps
+
+    torch.cuda.set_per_process_memory_fraction(1.0)
+
     logging_dir = Path(args.model_dir, "logging")
+    db_logging_dir = logging_dir.joinpath(project_name)
+
+    if args.revision == 0 and db_logging_dir.exists():
+        db_logging_dir.rename(logging_dir.joinpath(f"{project_name}-{int(time.time())}"))
+
     args.max_token_length = int(args.max_token_length)
     if not args.pad_tokens and args.max_token_length > 75:
         print("Cannot raise token length limit above 75 when pad_tokens=False")
@@ -618,7 +627,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.
     if accelerator.is_main_process:
-        accelerator.init_trackers("dreambooth")
+        accelerator.init_trackers(project_name)
 
     # Train!
     total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
@@ -783,7 +792,8 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                 mem_allocated = 0
                 mem_reserved = 0
                 mem_max_allocated = 0
-                mem_max_reserved = 0                
+                mem_max_reserved = 0    
+
                 weights_saved = False
                 with accelerator.accumulate(unet), accelerator.accumulate(text_encoder):
                     # Convert images to latent space
@@ -851,10 +861,13 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                     lr_scheduler.step()
 
                     # this is the best place to track mem usage
-                    mem_allocated = torch.cuda.memory_allocated(0)
-                    mem_reserved = torch.cuda.memory_reserved(0)
-                    mem_max_allocated = torch.cuda.max_memory_allocated(0)
-                    mem_max_reserved = torch.cuda.max_memory_reserved(0)
+                    mem_allocated = torch.cuda.memory_allocated()
+                    mem_reserved = torch.cuda.memory_reserved()
+                    mem_max_allocated = torch.cuda.max_memory_allocated()
+                    mem_max_reserved = torch.cuda.max_memory_reserved()
+
+                    torch.cuda.reset_max_memory_allocated()
+                    torch.cuda.reset_max_memory_cached()
 
                     optimizer.zero_grad(set_to_none=True)
                     loss_avg.add(loss.item())
@@ -862,6 +875,11 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                     # Update EMA
                     if args.use_ema and ema_unet is not None:
                         ema_unet.step(unet.parameters())
+
+                progress_bar.update(args.train_batch_size)
+                global_step += args.train_batch_size
+                args.revision += args.train_batch_size
+                shared.state.job_no = global_step
 
                 training_complete = global_step >= actual_train_steps or shared.state.interrupted
                 if not args.save_use_epochs:
@@ -878,6 +896,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                         if save_img or save_model:
                             args.save()
                             save_weights()
+                            progress_bar.unpause()
                             args = from_file(args.model_name)
                             weights_saved = save_model
                             shared.state.job_count = actual_train_steps
@@ -898,10 +917,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                                             f" total."
                     break
 
-                progress_bar.update(args.train_batch_size)
-                global_step += args.train_batch_size
-                args.revision += args.train_batch_size
-                shared.state.job_no = global_step
+
 
                 allocated = round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1)
                 cached = round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1)
@@ -910,10 +926,12 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
                 progress_bar.set_postfix(**logs)
 
                 # append some extra metrics for tensorboard
-                logs["mem_allocated"] = mem_allocated
-                logs["mem_max_allocated"] = mem_max_allocated
-                logs["mem_reserved"] = mem_reserved
-                logs["mem_max_reserved"] = mem_max_reserved
+                logs["memory"] = {
+                    "allocated": mem_allocated / 1024 ** 2,
+                    "max_allocated": mem_max_allocated / 1024 ** 2,
+                    "reserved": mem_reserved / 1024 ** 2,
+                    "max_reserved": mem_max_reserved / 1024 ** 2,
+                }
 
                 accelerator.log(logs, step=args.revision)
 
