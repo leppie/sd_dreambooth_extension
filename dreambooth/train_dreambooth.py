@@ -1,4 +1,3 @@
-import argparse
 import collections
 import hashlib
 import itertools
@@ -116,21 +115,13 @@ class RollingAverage:
         # Return the average of the values in the deque
         return self.sum / len(self.deque)
 
-class AverageMeter:
-    def __init__(self, name=None):
-        self.name = name
-        self.avg: torch.Tensor = None
-        self.sum = 0
-        self.count = 0
-
-    def reset(self):
-        self.sum = self.count = self.avg = 0
-
-    def update(self, val, n=1):
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
+def count_iter_items(iterable):
+    """
+    Consume an iterable not reading it into memory; return the number of items.
+    """
+    counter = itertools.count()
+    collections.deque(zip(iterable, counter), maxlen=0)  # (consume at C speed)
+    return next(counter)
 
 def get_full_repo_name(model_id: str, organization: Optional[str] = None, token: Optional[str] = None):
     if token is None:
@@ -938,7 +929,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
             training_complete = global_step >= actual_train_steps or shared.state.interrupted
             accelerator.wait_for_everyone()
 
-            if not args.not_cache_latents:
+            if not args.not_cache_latents and not training_complete:
                 train_dataset, train_dataloader = cache_latents(enc_vae=vae, orig_dataset=gen_dataset)
 
             if training_complete:
