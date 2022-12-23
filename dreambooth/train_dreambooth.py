@@ -916,8 +916,8 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
 
 
 
-                allocated = round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1)
-                cached = round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1)
+                allocated = round(float(torch.cuda.memory_allocated()) / 1024 ** 3, 3)
+                cached = round(float(torch.cuda.memory_reserved()) / 1024 ** 3, 3)
                 logs = {"loss": loss_avg.get(), "lr": lr_scheduler.get_last_lr()[0],
                         "vram": f"{allocated}/{cached}GB"}
                 progress_bar.set_postfix(**logs)
