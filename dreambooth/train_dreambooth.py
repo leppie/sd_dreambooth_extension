@@ -145,7 +145,9 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     max_train_steps = args.max_train_steps
 
     if args.seed is not None:
-        set_seed(args.seed)
+        if args.seed == -1:
+            args.seed = int(random.randrange(21474836147 - args.revision))
+        set_seed(args.seed + args.revision)
 
     logging_dir = Path(args.model_dir, "logging")
     db_logging_dir = logging_dir.joinpath(project_name)
