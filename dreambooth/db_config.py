@@ -18,6 +18,7 @@ class DreamboothConfig:
     initial_revision = 0
     epoch = 0
     resolution = 512
+    seed = 0
 
     def __init__(self,
                  model_name: str = "",

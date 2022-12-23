@@ -15,6 +15,7 @@ import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
 from accelerate import Accelerator
+from accelerate.utils.random import set_seed
 from diffusers import AutoencoderKL, DDIMScheduler, DiffusionPipeline, UNet2DConditionModel
 from diffusers.optimization import get_scheduler
 from diffusers.utils import logging as dl
@@ -143,7 +144,8 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     project_name = "dreambooth"
     max_train_steps = args.max_train_steps
 
-    torch.cuda.set_per_process_memory_fraction(1.0)
+    if args.seed is not None:
+        set_seed(args.seed)
 
     logging_dir = Path(args.model_dir, "logging")
     db_logging_dir = logging_dir.joinpath(project_name)
@@ -569,9 +571,10 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     if not args.not_cache_latents:
         train_dataset, train_dataloader = cache_latents(enc_vae=vae, orig_dataset=gen_dataset)
 
+    eff_grad_steps = min(args.gradient_accumulation_steps, len(train_dataloader))
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / eff_grad_steps)
     
     if max_train_steps is None or max_train_steps < 1:
         max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
@@ -608,8 +611,9 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
             )
 
     printm("Scheduler, EMA Loaded.")
+    eff_grad_steps = min(args.gradient_accumulation_steps, len(train_dataloader))
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / eff_grad_steps)
     if overrode_max_train_steps:
         max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
@@ -621,7 +625,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
         accelerator.init_trackers(project_name)
 
     # Train!
-    total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
+    total_batch_size = args.train_batch_size * accelerator.num_processes * eff_grad_steps
     stats = f"CPU: {args.use_cpu}, Adam: {use_adam}, Prec: {args.mixed_precision}, " \
             f"Grad: {args.gradient_checkpointing}, TextTr: {args.train_text_encoder}, EM: {args.use_ema}, " \
             f"LR: {args.learning_rate}, LORA: {args.use_lora}, UNET: {args.train_unet}"
@@ -632,7 +636,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     print(f"  Num Epochs = {args.num_train_epochs}")
     print(f"  Instantaneous batch size per device = {args.train_batch_size}")
     print(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
-    print(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
+    print(f"  Gradient Accumulation steps = {eff_grad_steps}")
     print(f"  Total optimization steps = {max_train_steps}")
     print(f"  Actual steps: {actual_train_steps}")
     printm(f"  Training settings: {stats}")
