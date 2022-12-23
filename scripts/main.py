@@ -162,7 +162,7 @@ def on_ui_tabs():
                                     db_train_unet = gr.Checkbox(label="Train UNET", value=True)
                                     db_train_text_encoder = gr.Checkbox(label="Train Text Encoder", value=True)
                                     db_train_in_stages = gr.Checkbox(label="Train Text Encoder and UNET in Two Stages", value=False)
-                                    db_stage_step_ratio = gr.Slider(label="Step Ratio of Text Encoder Training", minimum=0, maximum=2, step=0.01, value=1, visible=False)
+                                    db_stage_epoch_ratio = gr.Slider(label="Step Ratio of Text Encoder Training", minimum=0, maximum=1, step=0.01, value=1, visible=True)
                                     db_prior_loss_weight = gr.Number(label="Prior Loss Weight", value=1.0, precision=1)
                                     db_pad_tokens = gr.Checkbox(label="Pad Tokens", value=True)
                                     db_shuffle_tags = gr.Checkbox(label="Shuffle Tags", value=False)
@@ -293,7 +293,7 @@ def on_ui_tabs():
                 db_use_lora,
                 db_train_unet,
                 db_train_in_stages,
-                db_stage_step_ratio,
+                db_stage_epoch_ratio,
                 db_v2,
                 c1_class_data_dir,
                 c1_class_guidance_scale,
@@ -404,7 +404,7 @@ def on_ui_tabs():
                 db_use_lora,
                 db_train_unet,
                 db_train_in_stages,
-                db_stage_step_ratio,
+                db_stage_epoch_ratio,
                 c1_class_data_dir,
                 c1_class_guidance_scale,
                 c1_class_infer_steps,
@@ -489,10 +489,10 @@ def on_ui_tabs():
 
         db_train_in_stages.change(
             fn=lambda x: {
-                db_stage_step_ratio: gr_show(x is True)
+                db_stage_epoch_ratio: gr_show(x is True)
             },
             inputs=[db_train_in_stages],
-            outputs=[db_stage_step_ratio]
+            outputs=[db_stage_epoch_ratio]
         )
 
         db_create_from_hub.change(

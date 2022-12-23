@@ -269,7 +269,7 @@ def load_params(model_dir):
                "db_use_lora",
                "db_train_unet",
                "db_train_in_stages",
-               "db_stage_step_ratio",
+               "db_stage_epoch_ratio",
                "c1_class_data_dir", "c1_class_guidance_scale", "c1_class_infer_steps",
                "c1_class_negative_prompt", "c1_class_prompt", "c1_class_token",
                "c1_instance_data_dir", "c1_instance_prompt", "c1_instance_token", "c1_max_steps", "c1_n_save_sample",
@@ -380,7 +380,7 @@ def start_training(model_dir: str, lora_model_name: str, lora_alpha: float, lora
             config.train_unet = False
             config.train_text_encoder = True
             config.gradient_accumulation_steps = grad_steps * 8
-            config.num_train_epochs = int(math.ceil(epochs * config.stage_step_ratio))
+            config.num_train_epochs = int(math.ceil(epochs * config.stage_epoch_ratio))
             print ("Stage 1: Text Encoder\n")
         if stage_enable and stage == 2:
             config.use_ema = False
