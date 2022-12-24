@@ -348,7 +348,9 @@ def start_training(model_dir: str, lora_model_name: str, lora_alpha: float, lora
     if config.train_in_stages and not config.train_unet or not config.train_text_encoder:
         msg = "Multi-Stage training require both Train UNET and Train Text Encoder to be enable."
     if config.train_in_stages and config.use_lora:
-        msg = "Multi-Stage training cannot continue if LoRA enabled, disable either one." # why use Multi-Stage when LoRA can be train on <= 8GB GPUs
+        msg = "Multi-Stage training cannot continue if LoRA enabled, disable either one." # Why use Multi-Stage when LoRA can be train on <= 8GB GPUs
+    if config.train_in_stages and config.use_ema:
+        msg = "Multi-Stage training cannot continue if EMA enabled, disable Use EMA." # <= 10GB GPU cannot train with EMA enable
 
     if msg:
         shared.state.textinfo = msg
@@ -365,52 +367,62 @@ def start_training(model_dir: str, lora_model_name: str, lora_alpha: float, lora
 
     epochs = config.num_train_epochs
     grad_steps = config.gradient_accumulation_steps
-
     stage_enable = config.train_in_stages
-    stage_steps = [1, 2] if stage_enable else [1]
-    for stage in stage_steps:
-        if stage_enable:
-            print("=========================================================")
-            print("UNET and Text Encoder will train separately to save VRAM!")
-            print("=========================================================")
-        if stage_enable and shared.state.interrupted:
-            print ("Stage training interrupted!\n")
-            break
-        if stage_enable and stage == 1:
-            config.train_unet = False
-            config.train_text_encoder = True
-            config.gradient_accumulation_steps = grad_steps * 8
-            config.num_train_epochs = int(math.ceil(epochs * config.stage_step_ratio))
-            print ("Stage 1: Text Encoder\n")
-        if stage_enable and stage == 2:
-            config.use_ema = False
-            config.train_unet = True
-            config.train_text_encoder = False
-            config.gradient_accumulation_steps = grad_steps
-            config.num_train_epochs = epochs
-            print ("Stage 2: UNET\n")
+    gen_class_images = any(int(getattr(concept, 'num_class_images')) != 0 for concept in config.concepts_list)
 
-        try:
-            if imagic_only:
-                shared.state.textinfo = "Initializing imagic training..."
-                print(shared.state.textinfo)
-                from extensions.sd_dreambooth_extension.dreambooth.train_imagic import train_imagic
-                mem_record = train_imagic(config, mem_record)
-            else:
-                shared.state.textinfo = "Initializing dreambooth training..."
-                print(shared.state.textinfo)
-                from extensions.sd_dreambooth_extension.dreambooth.train_dreambooth import main
+    try:
+        if imagic_only:
+            shared.state.textinfo = "Initializing imagic training..."
+            print(shared.state.textinfo)
+            from extensions.sd_dreambooth_extension.dreambooth.train_imagic import train_imagic
+            mem_record = train_imagic(config, mem_record)
+        else:
+            shared.state.textinfo = "Initializing dreambooth training..."
+            print(shared.state.textinfo)
+            from extensions.sd_dreambooth_extension.dreambooth.train_dreambooth import main
+
+            # Single/Multi-Stage Training
+            stage_steps = [0, 1, 2] if stage_enable else [1]
+            for stage in stage_steps:
+                if stage_enable and stage > 0:
+                    print("=========================================================")
+                    print("UNET and Text Encoder will train separately to save VRAM!")
+                    print("=========================================================")
+                if stage_enable and shared.state.interrupted:
+                    print ("Stage training interrupted!\n")
+                    break
+                if stage_enable and stage == 0:
+                    if gen_class_images:
+                        print ("Stage 0: Generate Class Image before Multi-Stage training.\n")
+                    else:
+                        continue
+                if stage_enable and stage == 1:
+                    config.train_unet = False
+                    config.train_text_encoder = True
+                    config.gradient_accumulation_steps = grad_steps * 8
+                    config.num_train_epochs = int(math.ceil(epochs * config.stage_step_ratio))
+                    [setattr(concept, 'num_class_images', 0) for concept in config.concepts_list]
+                    print ("Stage 1: Text Encoder\n")
+                if stage_enable and stage == 2:
+                    config.use_ema = False
+                    config.train_unet = True
+                    config.train_text_encoder = False
+                    config.gradient_accumulation_steps = grad_steps
+                    config.num_train_epochs = epochs
+                    print ("Stage 2: UNET\n")
+
                 config, mem_record, msg = main(config, mem_record, use_subdir=use_subdir, lora_model=lora_model_name,
                                             lora_alpha=lora_alpha, lora_txt_alpha=lora_txt_alpha, custom_model_name=custom_model_name)
-                if config.revision != total_steps:
-                    config.save()
-            total_steps = config.revision
-            res = f"Training {'interrupted' if shared.state.interrupted else 'finished'}. " \
-                f"Total lifetime steps: {total_steps} \n"
-        except Exception as e:
-            res = f"Exception training model: {e}"
-            traceback.print_exc()
-            pass
+
+            if config.revision != total_steps:
+                config.save()
+        total_steps = config.revision
+        res = f"Training {'interrupted' if shared.state.interrupted else 'finished'}. " \
+            f"Total lifetime steps: {total_steps} \n"
+    except Exception as e:
+        res = f"Exception training model: {e}"
+        traceback.print_exc()
+        pass
 
     devices.torch_gc()
     gc.collect()
