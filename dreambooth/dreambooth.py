@@ -409,6 +409,7 @@ def start_training(model_dir: str, lora_model_name: str, lora_alpha: float, lora
                     config.train_text_encoder = False
                     config.gradient_accumulation_steps = grad_steps
                     config.num_train_epochs = epochs
+                    [setattr(concept, 'num_class_images', 0) for concept in config.concepts_list]
                     print ("Stage 2: UNET\n")
 
                 config, mem_record, msg = main(config, mem_record, use_subdir=use_subdir, lora_model=lora_model_name,
