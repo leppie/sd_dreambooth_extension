@@ -624,6 +624,8 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(max_train_steps / num_update_steps_per_epoch)
     actual_train_steps = max_train_steps * args.train_batch_size
+    # we calculate our number of tenc training epochs
+    text_encoder_epochs=round(args.num_train_epochs*args.stage_epoch_ratio)
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.
     if accelerator.is_main_process:
@@ -639,6 +641,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     print(f"  Num examples = {len(train_dataset)}")
     print(f"  Num batches each epoch = {len(train_dataloader)}")
     print(f"  Num Epochs = {args.num_train_epochs}")
+    print(f"  Text Encoder Epochs: {text_encoder_epochs}")
     print(f"  Instantaneous batch size per device = {args.train_batch_size}")
     print(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
     print(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
@@ -786,7 +789,7 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
         try:
             if args.train_unet:
                 unet.train()
-            if args.train_text_encoder and text_encoder is not None:
+            if (args.train_text_encoder and args.train_text_encoder<=text_encoder_epochs and text_encoder is not None):
                 text_encoder.train()
             for step, batch in enumerate(train_dataloader):
                 mem_allocated = 0
