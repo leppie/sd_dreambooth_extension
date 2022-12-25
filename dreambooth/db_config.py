@@ -72,7 +72,7 @@ class DreamboothConfig:
                  use_lora: bool = False,
                  train_unet: bool = True,
                  train_in_stages: bool = False,
-                 stage_step_ratio: float = 1.0,
+                 stage_epoch_ratio: float = 1.0,
                  v2: bool = False,
                  c1_class_data_dir: str = "",
                  c1_class_guidance_scale: float = 7.5,
@@ -191,7 +191,7 @@ class DreamboothConfig:
         self.use_lora = False if use_lora is None else use_lora
         self.train_unet = False if train_unet is None else train_unet
         self.train_in_stages = False if train_in_stages is None else train_in_stages
-        self.stage_step_ratio = stage_step_ratio
+        self.stage_epoch_ratio = stage_epoch_ratio
         if scheduler is not None:
             self.scheduler = scheduler
 
