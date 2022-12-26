@@ -504,6 +504,9 @@ def main(args: DreamboothConfig, memory_record, use_subdir, lora_model=None, lor
     del text_getter
     cleanup()
 
+    if args.train_in_stages and any(int(getattr(concept, 'num_class_images')) != 0 for concept in args.concepts_list):
+        return args, mem_record, "Stage 0: Complete!"
+
     # Load the tokenizer
     if args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(
