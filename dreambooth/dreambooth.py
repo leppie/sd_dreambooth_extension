@@ -345,12 +345,13 @@ def start_training(model_dir: str, lora_model_name: str, lora_alpha: float, lora
         msg = "Invalid Pretrained VAE Path."
     if config.resolution <= 0:
         msg = "Invalid resolution."
-    if config.train_in_stages and (not config.train_unet or not config.train_text_encoder):
-        msg = "Multi-Stage training require both Train UNET and Train Text Encoder to be enable."
-    if config.train_in_stages and config.use_lora:
-        msg = "Multi-Stage training cannot continue if LoRA enabled, disable either one." # Why use Multi-Stage when LoRA can be train on <= 8GB GPUs
-    if config.train_in_stages and config.use_ema:
-        msg = "Multi-Stage training cannot continue if EMA enabled, disable Use EMA." # <= 10GB GPU cannot train with EMA enable
+    if config.train_in_stages:
+        if not config.train_unet or not config.train_text_encoder:
+            msg = "Multi-Stage training require both Train UNET and Train Text Encoder to be enable."
+        if config.use_lora:
+            msg = "Multi-Stage training cannot continue if LoRA enabled, disable either one." # Why use Multi-Stage when LoRA can be train on <= 8GB GPUs
+        if config.use_ema:
+            msg = "Multi-Stage training cannot continue if EMA enabled, disable Use EMA." # <= 10GB GPU cannot train with EMA enable
 
     if msg:
         shared.state.textinfo = msg
